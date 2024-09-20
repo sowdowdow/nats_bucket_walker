@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"nats_bucket_walker/cli"
 	"os"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/buger/goterm"
@@ -13,7 +15,19 @@ import (
 	"github.com/nats-io/nats.go/jetstream"
 )
 
-func GetAllKeys(bucket string) ([]string, error) {
+func Clear() {
+	cmd := exec.Command("clear") //Linux example, its tested
+	cmd.Stdout = os.Stdout
+	cmd.Run()
+}
+func truncateText(s string, max int) string {
+	if max > len(s) {
+		return s
+	}
+	return s[:strings.LastIndexAny(s[:max], " .,:;-")]
+}
+
+func GetAllKV(bucket string) ([]string, error) {
 	// connect to nats server
 	url := nats.DefaultURL
 	if val, ok := os.LookupEnv("NATS_URL"); ok {
@@ -40,11 +54,20 @@ func GetAllKeys(bucket string) ([]string, error) {
 
 	// DEPRECATED
 	keys, err := kv.Keys(ctx)
+	kv_map := []string{}
+	for _, k := range keys {
+		kvEntry, err := kv.Get(ctx, k)
+		if err != nil {
+			return []string{}, err
+		}
+		val := string(kvEntry.Value())
+		kv_map = append(kv_map, k+" = "+truncateText(val, 50))
+	}
 	if err != nil {
 		return []string{}, err
 	}
 
-	return keys, nil
+	return kv_map, nil
 }
 func GetAllBuckets() ([]string, error) {
 	// connect to nats server
@@ -96,8 +119,8 @@ func main() {
 
 	server := "#SERVER"
 	for {
-		goterm.Clear()
-		menu := cli.NewMenu(fmt.Sprintf("%v Available buckets", server))
+		Clear()
+		menu := cli.NewMenu(fmt.Sprintf("%v available buckets", server))
 
 		for _, b := range buckets {
 			menu.AddItem(b, b)
@@ -111,19 +134,19 @@ func main() {
 			break
 		} else {
 			// list all keys in a bucket
-			keys, err := GetAllKeys(choice)
+			Clear()
+			keys, err := GetAllKV(choice)
 			if err != nil {
 				panic(err)
 			}
-			fmt.Println("==================")
-			fmt.Printf(" Content of %v\n", choice)
-			fmt.Println("==================")
+			t := goterm.Color(fmt.Sprintf("Content of %v\n", choice), goterm.YELLOW)
+			fmt.Println(t)
 			for _, k := range keys {
-				println(k)
+				println("  " + k)
 			}
 			println("==================")
 			PressToContinue()
-
+			Clear()
 		}
 
 	}
