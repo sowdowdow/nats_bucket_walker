@@ -24,7 +24,7 @@ func truncateText(s string, max int) string {
 	if max > len(s) {
 		return s
 	}
-	return s[:strings.LastIndexAny(s[:max], " .,:;-")]
+	return s[:strings.LastIndexAny(s[:max], " .,:;-")] + "..."
 }
 
 func GetAllKV(bucket string) ([]string, error) {
@@ -33,7 +33,7 @@ func GetAllKV(bucket string) ([]string, error) {
 	if val, ok := os.LookupEnv("NATS_URL"); ok {
 		url = val
 	} else {
-		panic("Could not connect to NATS")
+		panic("Could not connect to NATS, no NATS_URL specified")
 	}
 	conn, _ := nats.Connect(url)
 	// defer conn.Close()
@@ -61,7 +61,7 @@ func GetAllKV(bucket string) ([]string, error) {
 			return []string{}, err
 		}
 		val := string(kvEntry.Value())
-		kv_map = append(kv_map, k+" = "+truncateText(val, 50))
+		kv_map = append(kv_map, k+" = "+truncateText(val, goterm.Width()-15))
 	}
 	if err != nil {
 		return []string{}, err
@@ -75,7 +75,7 @@ func GetAllBuckets() ([]string, error) {
 	if val, ok := os.LookupEnv("NATS_URL"); ok {
 		url = val
 	} else {
-		panic("Could not connect to NATS")
+		panic("Could not connect to NATS, no NATS_URL specified")
 	}
 	conn, _ := nats.Connect(url)
 	defer conn.Close()
@@ -118,15 +118,17 @@ func main() {
 	}
 
 	server := "#SERVER"
+	var lastCurPos int
 	for {
 		Clear()
 		menu := cli.NewMenu(fmt.Sprintf("%v available buckets", server))
 
 		for _, b := range buckets {
 			menu.AddItem(b, b)
-
 		}
 		menu.AddItem("🚪 Quit", "quit")
+
+		menu.CursorPos = lastCurPos
 
 		choice := menu.Display()
 
@@ -134,6 +136,7 @@ func main() {
 			break
 		} else {
 			// list all keys in a bucket
+			lastCurPos = menu.CursorPos
 			Clear()
 			keys, err := GetAllKV(choice)
 			if err != nil {
