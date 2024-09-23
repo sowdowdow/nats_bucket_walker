@@ -139,7 +139,8 @@ func main() {
 			for _, k := range keys {
 				println("  " + k)
 			}
-			println("==================")
+			fmt.Println("==================")
+			fmt.Printf("%v entries", len(keys))
 			cli.GetInput()
 			Clear()
 		}
