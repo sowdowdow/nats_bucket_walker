@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"nats_bucket_walker/cli"
@@ -100,13 +99,6 @@ func GetAllBuckets() ([]string, error) {
 	return names, nil
 }
 
-func PressToContinue() {
-	fmt.Print("press to continue...")
-	input := bufio.NewScanner(os.Stdin)
-	input.Scan()
-	fmt.Println(input.Text())
-}
-
 func main() {
 	buckets, err := GetAllBuckets()
 	if err != nil {
@@ -148,7 +140,7 @@ func main() {
 				println("  " + k)
 			}
 			println("==================")
-			PressToContinue()
+			cli.GetInput()
 			Clear()
 		}
 
