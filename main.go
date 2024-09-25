@@ -1,150 +1,128 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"nats_bucket_walker/cli"
+	natsbinding "nats_bucket_walker/nats_binding"
 	"os"
-	"os/exec"
-	"strings"
-	"time"
 
-	"github.com/buger/goterm"
-	"github.com/nats-io/nats.go"
-	"github.com/nats-io/nats.go/jetstream"
+	"github.com/charmbracelet/bubbles/table"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
-func Clear() {
-	cmd := exec.Command("clear") //Linux example, its tested
-	cmd.Stdout = os.Stdout
-	cmd.Run()
-}
-func truncateText(s string, max int) string {
-	if max > len(s) {
-		return s
-	}
-	return s[:strings.LastIndexAny(s[:max], " .,:;-")] + "..."
+var baseStyle = lipgloss.NewStyle().
+	BorderStyle(lipgloss.NormalBorder()).
+	BorderForeground(lipgloss.Color("240"))
+
+type model struct {
+	table    table.Model
+	inBucket bool
 }
 
-func GetAllKV(bucket string) ([]string, error) {
-	// connect to nats server
-	url := nats.DefaultURL
-	if val, ok := os.LookupEnv("NATS_URL"); ok {
-		url = val
-	} else {
-		panic("Could not connect to NATS, no NATS_URL specified")
-	}
-	conn, _ := nats.Connect(url)
-	// defer conn.Close()
+func (m model) Init() tea.Cmd { return nil }
 
-	// create jetstream context from nats connection
-	js, err := jetstream.New(conn)
-	if err != nil {
-		return []string{}, err
-	}
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.table.SetHeight(msg.Height - 5)
+		m.table.SetWidth(msg.Width - 2)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+		m.table.Columns()[0].Width = msg.Width - 4
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "esc", "left", "h":
+			if m.inBucket {
+				// data retrieval
+				buckets, err := natsbinding.GetAllBuckets()
+				if err != nil {
+					panic(err)
+				}
+				newRows := []table.Row{}
+				for _, b := range buckets {
+					newRows = append(newRows, table.Row{b})
+				}
 
-	kv, err := js.KeyValue(ctx, bucket)
-	if err != nil {
-		return []string{}, err
-	}
+				m.table.SetRows(newRows)
+				m.inBucket = false
+				m.table.Columns()[0].Title = "Bucket"
+				return m, tea.Batch(
+					tea.Printf("Quitting bucket"),
+				)
+			}
+		case "q", "ctrl+c":
+			return m, tea.Quit
+		case "enter", "right", "l":
+			if m.inBucket {
+				break
+			}
+			m.inBucket = true
+			selected := m.table.SelectedRow()[0]
+			kvs, err := natsbinding.GetAllKV(selected)
+			if err != nil {
+				panic(err)
+			}
 
-	// DEPRECATED
-	keys, err := kv.Keys(ctx)
-	kv_map := []string{}
-	for _, k := range keys {
-		kvEntry, err := kv.Get(ctx, k)
-		if err != nil {
-			return []string{}, err
+			newRows := []table.Row{}
+			for _, kv := range kvs {
+				newRows = append(newRows, table.Row{kv})
+			}
+
+			m.table.SetRows(newRows)
+			m.table.Columns()[0].Title = selected
+			m.inBucket = true
+			return m, tea.Batch(
+				tea.Printf("Opening %s", selected),
+			)
 		}
-		val := string(kvEntry.Value())
-		kv_map = append(kv_map, k+" = "+truncateText(val, goterm.Width()-15))
 	}
-	if err != nil {
-		return []string{}, err
-	}
-
-	return kv_map, nil
+	m.table, cmd = m.table.Update(msg)
+	return m, cmd
 }
-func GetAllBuckets() ([]string, error) {
-	// connect to nats server
-	url := nats.DefaultURL
-	if val, ok := os.LookupEnv("NATS_URL"); ok {
-		url = val
-	} else {
-		panic("Could not connect to NATS, no NATS_URL specified")
-	}
-	conn, _ := nats.Connect(url)
-	defer conn.Close()
 
-	// create jetstream context from nats connection
-	js, err := jetstream.New(conn)
-	if err != nil {
-		return []string{}, err
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	// retrieve all names
-	names := []string{}
-	osnl := js.KeyValueStoreNames(ctx)
-	for n := range osnl.Name() {
-		println(n)
-		names = append(names, n)
-	}
-
-	return names, nil
+func (m model) View() string {
+	return baseStyle.Render(m.table.View()) + "\n  " + m.table.HelpView() + "\n"
 }
 
 func main() {
-	buckets, err := GetAllBuckets()
+
+	// data retrieval
+	buckets, err := natsbinding.GetAllBuckets()
 	if err != nil {
 		panic(err)
 	}
 
-	for _, k := range buckets {
-		fmt.Println(k)
+	columns := []table.Column{
+		{Title: "Bucket", Width: 30},
 	}
 
-	server := "#SERVER"
-	var lastCurPos int
-	for {
-		Clear()
-		menu := cli.NewMenu(fmt.Sprintf("%v available buckets", server))
-
-		for _, b := range buckets {
-			menu.AddItem(b, b)
-		}
-		menu.AddItem("🚪 Quit", "quit")
-
-		menu.CursorPos = lastCurPos
-
-		choice := menu.Display()
-
-		if choice == "quit" {
-			break
-		} else {
-			// list all keys in a bucket
-			lastCurPos = menu.CursorPos
-			Clear()
-			keys, err := GetAllKV(choice)
-			if err != nil {
-				panic(err)
-			}
-			t := goterm.Color(fmt.Sprintf("Content of %v\n", choice), goterm.YELLOW)
-			fmt.Println(t)
-			for _, k := range keys {
-				println("  " + k)
-			}
-			fmt.Println("==================")
-			fmt.Printf("%v entries", len(keys))
-			cli.GetInput()
-			Clear()
-		}
-
+	rows := []table.Row{}
+	for _, b := range buckets {
+		rows = append(rows, table.Row{b})
 	}
 
+	t := table.New(
+		table.WithColumns(columns),
+		table.WithRows(rows),
+		table.WithFocused(true),
+		// table.WithHeight(7),
+	)
+
+	s := table.DefaultStyles()
+	s.Header = s.Header.
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("240")).
+		BorderBottom(true).
+		Bold(false)
+	s.Selected = s.Selected.
+		Foreground(lipgloss.Color("229")).
+		Background(lipgloss.Color("57")).
+		Bold(false)
+	t.SetStyles(s)
+
+	m := model{t, false}
+	if _, err := tea.NewProgram(m).Run(); err != nil {
+		fmt.Println("Error running program:", err)
+		os.Exit(1)
+	}
 }
