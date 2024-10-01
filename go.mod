@@ -3,15 +3,15 @@ module nats_bucket_walker
 go 1.23.0
 
 require (
-	github.com/charmbracelet/bubbletea v1.1.0
+	github.com/charmbracelet/bubbletea v1.1.1
 	github.com/charmbracelet/lipgloss v0.13.0
+	github.com/charmbracelet/x/term v0.2.0
 	github.com/nats-io/nats.go v1.37.0
 )
 
 require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
-	github.com/charmbracelet/x/ansi v0.2.3 // indirect
-	github.com/charmbracelet/x/term v0.2.0 // indirect
+	github.com/charmbracelet/x/ansi v0.3.2 // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -25,13 +25,11 @@ require (
 )
 
 require (
-	github.com/buger/goterm v1.0.4
 	github.com/charmbracelet/bubbles v0.20.0
-	github.com/klauspost/compress v1.17.2 // indirect
+	github.com/klauspost/compress v1.17.10 // indirect
 	github.com/nats-io/nkeys v0.4.7 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
-	github.com/pkg/term v1.1.0
-	golang.org/x/crypto v0.18.0 // indirect
-	golang.org/x/sys v0.24.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/crypto v0.27.0 // indirect
+	golang.org/x/sys v0.25.0 // indirect
+	golang.org/x/text v0.18.0 // indirect
 )

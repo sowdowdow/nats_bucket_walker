@@ -1,4 +1,4 @@
-package natsbinding
+package nats
 
 import (
 	"context"
@@ -18,7 +18,7 @@ func GetAllKV(bucket string) ([]string, error) {
 		panic("Could not connect to NATS, no NATS_URL specified")
 	}
 	conn, _ := nats.Connect(url)
-	// defer conn.Close()
+	defer conn.Close()
 
 	// create jetstream context from nats connection
 	js, err := jetstream.New(conn)
@@ -51,6 +51,51 @@ func GetAllKV(bucket string) ([]string, error) {
 
 	return kv_map, nil
 }
+
+func WatchBucket(bucket string) error {
+	// connect to nats server
+	url := nats.DefaultURL
+	if val, ok := os.LookupEnv("NATS_URL"); ok {
+		url = val
+	} else {
+		panic("Could not connect to NATS, no NATS_URL specified")
+	}
+	conn, _ := nats.Connect(url)
+	defer conn.Close()
+
+	// create jetstream context from nats connection
+	js, err := jetstream.New(conn)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	kv, err := js.KeyValue(ctx, bucket)
+	if err != nil {
+		return err
+	}
+
+	// watcher, err := kv.Watch(ctx, bucket+".*")
+	watcher, err := kv.WatchAll(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer watcher.Stop()
+
+	for u := range watcher.Updates() {
+		if u == nil {
+			println("Nothing happened")
+		} else {
+			println(u, u.Bucket(), u.Key(), u.Value())
+		}
+	}
+
+	return nil
+}
+
 func GetAllBuckets() ([]string, error) {
 	// connect to nats server
 	url := nats.DefaultURL
