@@ -6,15 +6,18 @@ import (
 	"github.com/charmbracelet/x/term"
 )
 
-func InitTable(data []string) table.Model {
-
+func GetTermWidth() int {
 	w, _, err := term.GetSize(0)
 	if err != nil {
 		panic(err)
 	}
+	return w
+}
+
+func InitTable(data []string) table.Model {
 
 	columns := []table.Column{
-		{Title: "Bucket", Width: w},
+		{Title: "Bucket", Width: GetTermWidth()},
 	}
 
 	rows := []table.Row{}

@@ -18,6 +18,12 @@ var baseStyle = lipgloss.NewStyle().
 type model struct {
 	table    table.Model
 	inBucket bool
+	bucket   bucket
+}
+
+type bucket struct {
+	watching bool
+	name     string
 }
 
 func (m model) Init() tea.Cmd { return nil }
@@ -33,14 +39,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "esc", "left", "h":
+			// TODO : check if bucket is in watch mode
+
 			if m.inBucket {
+				m.bucket = bucket{}
 				return m, m.ListBuckets()
 			}
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "enter", "right", "l":
 			if m.inBucket {
-				break
+				return m, func() tea.Msg {
+					// TODO : Add watching
+					return msg
+				}
 			}
 			return m, m.OpenBucket()
 		}
@@ -54,7 +66,6 @@ func (m model) View() string {
 }
 
 func main() {
-
 	// data retrieval
 	buckets, err := natsbinding.GetAllBuckets()
 	if err != nil {
@@ -62,9 +73,10 @@ func main() {
 	}
 
 	t := core.InitTable(buckets)
+	m := model{t, false, bucket{}}
+	p := tea.NewProgram(m)
 
-	m := model{t, false}
-	if _, err := tea.NewProgram(m).Run(); err != nil {
+	if _, err := p.Run(); err != nil {
 		fmt.Println("Error running program:", err)
 		os.Exit(1)
 	}

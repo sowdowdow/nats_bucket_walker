@@ -27,9 +27,11 @@ func (m *model) ListBuckets() tea.Cmd {
 }
 
 func (m *model) OpenBucket() tea.Cmd {
+
 	m.inBucket = true
-	selected := m.table.SelectedRow()[0]
-	kvs, err := natsbinding.GetAllKV(selected)
+	name := m.table.SelectedRow()[0]
+	m.bucket = bucket{watching: false, name: name}
+	kvs, err := natsbinding.GetAllKV(name)
 	if err != nil {
 		panic(err)
 	}
@@ -40,10 +42,10 @@ func (m *model) OpenBucket() tea.Cmd {
 	}
 
 	m.table.SetRows(newRows)
-	m.table.Columns()[0].Title = selected
+	m.table.Columns()[0].Title = name
 	m.inBucket = true
 
 	return tea.Batch(
-		tea.Printf("Opening %s", selected),
+		tea.Printf("Opening %s", name),
 	)
 }
