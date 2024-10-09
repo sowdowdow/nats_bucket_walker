@@ -19,6 +19,46 @@ type model struct {
 	inBucket bool
 }
 
+func ListBuckets(model *model) {
+	// data retrieval
+	buckets, err := natsbinding.GetAllBuckets()
+	if err != nil {
+		panic(err)
+	}
+	newRows := []table.Row{}
+	for _, b := range buckets {
+		newRows = append(newRows, table.Row{b})
+	}
+
+	model.table.SetRows(newRows)
+	model.inBucket = false
+	model.table.Columns()[0].Title = "Buckets"
+}
+
+func OpenBucket(model *model) tea.Cmd {
+	model.inBucket = true
+	selected := model.table.SelectedRow()[0]
+	kvs, err := natsbinding.GetAllKV(selected)
+	if err != nil {
+		if err.Error() == "no keys found" {
+			ListBuckets(model)
+			return tea.Printf(err.Error())
+		}
+		panic(err)
+	}
+
+	newRows := []table.Row{}
+	for _, kv := range kvs {
+		newRows = append(newRows, table.Row{kv})
+	}
+
+	model.table.SetRows(newRows)
+	model.table.Columns()[0].Title = selected
+	model.inBucket = true
+
+	return tea.Printf("Opening %s", selected)
+}
+
 func (m model) Init() tea.Cmd { return nil }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -33,47 +73,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "esc", "left", "h":
 			if m.inBucket {
-				// data retrieval
-				buckets, err := natsbinding.GetAllBuckets()
-				if err != nil {
-					panic(err)
-				}
-				newRows := []table.Row{}
-				for _, b := range buckets {
-					newRows = append(newRows, table.Row{b})
-				}
-
-				m.table.SetRows(newRows)
-				m.inBucket = false
-				m.table.Columns()[0].Title = "Bucket"
-				return m, tea.Batch(
-					tea.Printf("Quitting bucket"),
-				)
+				ListBuckets(&m) // getting out of the bucket
+				return m, tea.Printf("Quitting bucket")
 			}
 		case "q", "ctrl+c":
 			return m, tea.Quit
 		case "enter", "right", "l":
 			if m.inBucket {
-				break
+				return m, tea.Printf("Already in a bucket")
 			}
-			m.inBucket = true
-			selected := m.table.SelectedRow()[0]
-			kvs, err := natsbinding.GetAllKV(selected)
-			if err != nil {
-				panic(err)
-			}
-
-			newRows := []table.Row{}
-			for _, kv := range kvs {
-				newRows = append(newRows, table.Row{kv})
-			}
-
-			m.table.SetRows(newRows)
-			m.table.Columns()[0].Title = selected
-			m.inBucket = true
-			return m, tea.Batch(
-				tea.Printf("Opening %s", selected),
-			)
+			cmd := OpenBucket(&m)
+			return m, cmd
 		}
 	}
 	m.table, cmd = m.table.Update(msg)
