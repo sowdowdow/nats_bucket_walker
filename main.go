@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"nats_bucket_walker/models"
 	natsbinding "nats_bucket_walker/nats_binding"
 	"os"
 
@@ -102,35 +103,10 @@ func main() {
 		panic(err)
 	}
 
-	columns := []table.Column{
-		{Title: "Bucket", Width: 30},
-	}
-
-	rows := []table.Row{}
-	for _, b := range buckets {
-		rows = append(rows, table.Row{b})
-	}
-
-	t := table.New(
-		table.WithColumns(columns),
-		table.WithRows(rows),
-		table.WithFocused(true),
-		// table.WithHeight(7),
-	)
-
-	s := table.DefaultStyles()
-	s.Header = s.Header.
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("240")).
-		BorderBottom(true).
-		Bold(false)
-	s.Selected = s.Selected.
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-	t.SetStyles(s)
-
+	// model creation
+	t := models.NewTable("Buckets", buckets)
 	m := model{t, false}
+
 	if _, err := tea.NewProgram(m).Run(); err != nil {
 		fmt.Println("Error running program:", err)
 		os.Exit(1)
